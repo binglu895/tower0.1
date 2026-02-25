@@ -1,0 +1,15 @@
+export const COLORS = {
+    BORDER: '#1A1A1D',
+    BG_PAPER: '#FDF6E3',
+    SUIT_BLACK: '#2B2B2B',
+    SUIT_RED: '#FF2A2A',
+    NEON_CYAN: '#00E5FF',
+    NEON_YELLOW: '#FFEA00',
+    NEON_PINK: '#FF00FF',
+    OFF_WHITE: '#FFFFFF',
+    DEEP_BG: '#121212',
+    GRID_BG: '#2A0845',
+    OP_BG: '#111111',
+    TRANSITION_BG: '#222222',
+    NOTICE_BG: '#1a1a1d'
+};

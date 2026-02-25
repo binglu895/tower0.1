@@ -1,0 +1,164 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Comic Boom Effect Demo</title>
+    <!-- 引入美漫风格字体 -->
+    <link href="https://fonts.googleapis.com/css2?family=Bangers&family=Anton&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --comic-black: #1A1A1D;
+            --boom-yellow: #FFEA00;
+            --boom-pink: #FF007F;
+            --font-main: 'Bangers', cursive;
+        }
+
+        body {
+            background-color: #222;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+            margin: 0;
+            overflow: hidden;
+            font-family: var(--font-main);
+        }
+
+        /* 爆炸容器：控制动画播放 */
+        .boom-container {
+            position: relative;
+            width: 200px;
+            height: 200px;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+
+            /* 默认隐藏，激活时播放动画 */
+            opacity: 0;
+            pointer-events: none;
+        }
+
+        .boom-container.active {
+            animation: boom-pop-fade 1s cubic-bezier(0.175, 0.885, 0.32, 1.275) forwards;
+        }
+
+        /* 爆炸底图：多角星形 */
+        .starburst {
+            position: absolute;
+            width: 100%;
+            height: 100%;
+            background-color: var(--boom-yellow);
+
+            /* 使用 clip-path 裁切出不规则爆炸形状 */
+            clip-path: polygon(50% 0%, 65% 25%, 95% 10%, 80% 40%, 100% 50%,
+                    80% 60%, 95% 90%, 65% 75%, 50% 100%,
+                    35% 75%, 5% 90%, 20% 60%, 0% 50%,
+                    20% 40%, 5% 10%, 35% 25%);
+
+            /* 使用滤镜实现黑边和阴影 */
+            filter: drop-shadow(4px 0px 0px var(--comic-black)) drop-shadow(-4px 0px 0px var(--comic-black)) drop-shadow(0px 4px 0px var(--comic-black)) drop-shadow(0px -4px 0px var(--comic-black)) drop-shadow(8px 8px 0px var(--comic-black));
+        }
+
+        /* 爆炸文字 */
+        .boom-text {
+            position: relative;
+            z-index: 2;
+            font-size: 60px;
+            color: var(--boom-pink);
+
+            /* 强化漫画视觉 */
+            -webkit-text-stroke: 2.5px var(--comic-black);
+            text-shadow: 4px 4px 0px var(--comic-black);
+
+            transform: rotate(-10deg);
+            white-space: nowrap;
+        }
+
+        /* 核心动画：爆发 -> 停顿 -> 上浮 -> 消散 */
+        @keyframes boom-pop-fade {
+            0% {
+                transform: scale(0);
+                opacity: 0;
+            }
+
+            10% {
+                /* 瞬间爆发 */
+                transform: scale(1.6) rotate(5deg);
+                opacity: 1;
+            }
+
+            30% {
+                /* 回弹并产生定格打击感 */
+                transform: scale(1.2) rotate(-8deg);
+                opacity: 1;
+            }
+
+            80% {
+                /* 开始上浮并初步淡出 */
+                transform: scale(1.1) translateY(-60px) rotate(-12deg);
+                opacity: 0.8;
+            }
+
+            100% {
+                /* 完全消散 */
+                transform: scale(0.8) translateY(-100px) rotate(-15deg);
+                opacity: 0;
+            }
+        }
+
+        /* 演示控件 */
+        .controls {
+            position: absolute;
+            bottom: 50px;
+        }
+
+        button {
+            padding: 15px 30px;
+            font-family: var(--font-main);
+            font-size: 24px;
+            background: var(--boom-pink);
+            color: white;
+            border: 4px solid var(--comic-black);
+            box-shadow: 4px 4px 0px var(--comic-black);
+            cursor: pointer;
+            transition: transform 0.1s;
+        }
+
+        button:active {
+            transform: translate(2px, 2px);
+            box-shadow: 0px 0px 0px var(--comic-black);
+        }
+    </style>
+</head>
+
+<body>
+
+    <div id="boom-effect" class="boom-container">
+        <div class="starburst"></div>
+        <div class="boom-text">BOOM!</div>
+    </div>
+
+    <div class="controls">
+        <button onclick="playBoom()">触发爆发效果！</button>
+    </div>
+
+    <script>
+        function playBoom() {
+            const el = document.getElementById('boom-effect');
+            const texts = ["BOOM!", "CRIT!", "K.O.", "POW!", "COMBO x3"];
+
+            // 随机换字
+            el.querySelector('.boom-text').innerText = texts[Math.floor(Math.random() * texts.length)];
+
+            // 重置并触发动画
+            el.classList.remove('active');
+            void el.offsetWidth; // 触发 reflow
+            el.classList.add('active');
+        }
+    </script>
+
+</body>
+
+</html>

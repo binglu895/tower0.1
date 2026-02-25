@@ -1,0 +1,148 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Comic Speech Bubble Tooltip Demo</title>
+    <!-- 引入美漫风格字体 -->
+    <link
+        href="https://fonts.googleapis.com/css2?family=Bangers&family=Anton&family=Comic+Neue:wght@400;700&display=swap"
+        rel="stylesheet">
+    <style>
+        :root {
+            --comic-black: #1A1A1D;
+            --bubble-bg: #FFF9E6;
+            /* 泛黄纸色 */
+            --highlight-red: #FF2A2A;
+            --font-main: 'Comic Neue', 'Courier New', cursive;
+            --font-accent: 'Bangers', cursive;
+        }
+
+        body {
+            background-color: #333;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+            margin: 0;
+            font-family: var(--font-main);
+        }
+
+        /* 遗物容器 (触发元素) */
+        .relic-item {
+            position: relative;
+            width: 80px;
+            height: 80px;
+            background-color: #FFEA00;
+            /* 亮黄色遗物图标背景 */
+            border: 4px solid var(--comic-black);
+            box-shadow: 4px 4px 0px var(--comic-black);
+            cursor: pointer;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            font-size: 40px;
+            transition: transform 0.1s ease;
+        }
+
+        .relic-item:hover {
+            transform: scale(1.05) rotate(-2deg);
+        }
+
+        /* 气泡提示框主体 */
+        .speech-bubble {
+            position: absolute;
+            bottom: 120%;
+            /* 弹出到图标上方 */
+            left: 50%;
+            transform: translateX(-50%) scale(0.5) translateY(10px);
+            width: 220px;
+            background-color: var(--bubble-bg);
+            border: 4px solid var(--comic-black);
+            border-radius: 8px;
+            padding: 15px;
+            box-shadow: 6px 6px 0px var(--comic-black);
+
+            /* 状态：隐藏 */
+            opacity: 0;
+            pointer-events: none;
+            z-index: 100;
+
+            /* 核心弹性动效 */
+            transition: opacity 0.2s ease, transform 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+        }
+
+        /* 悬停显示逻辑 */
+        .relic-item:hover .speech-bubble {
+            opacity: 1;
+            transform: translateX(-50%) scale(1) translateY(0);
+        }
+
+        /* 气泡小尾巴 (外层描边) */
+        .speech-bubble::before {
+            content: "";
+            position: absolute;
+            bottom: -24px;
+            /* 对接气泡底部 */
+            left: 50%;
+            transform: translateX(-50%);
+            border-width: 12px;
+            border-style: solid;
+            border-color: var(--comic-black) transparent transparent transparent;
+        }
+
+        /* 气泡小尾巴 (内层颜色) */
+        .speech-bubble::after {
+            content: "";
+            position: absolute;
+            bottom: -16px;
+            /* 略微缩进，露出外层作为边框 */
+            left: 50%;
+            transform: translateX(-50%);
+            border-width: 10px;
+            border-style: solid;
+            border-color: var(--bubble-bg) transparent transparent transparent;
+        }
+
+        /* 文字排版 */
+        .speech-bubble .content {
+            color: var(--comic-black);
+            font-size: 16px;
+            line-height: 1.4;
+            font-weight: 700;
+            margin: 0;
+        }
+
+        /* 重点关键词样式 */
+        .keyword {
+            font-family: var(--font-accent);
+            color: var(--highlight-red);
+            font-size: 20px;
+            text-transform: uppercase;
+            -webkit-text-stroke: 0.5px var(--comic-black);
+            display: inline-block;
+            margin: 0 2px;
+            vertical-align: middle;
+        }
+    </style>
+</head>
+
+<body>
+
+    <!-- 遗物图标示例 -->
+    <div class="relic-item">
+        🔥
+        <!-- 对话气泡提示 -->
+        <div class="speech-bubble">
+            <p class="content">
+                获得 <span class="keyword">FRENZY</span> 效果！
+                本回合下一次攻击将 <span class="keyword">DOUBLE DAMAGE</span>，
+                但之后会失去 <span class="keyword">2 HP</span>！
+            </p>
+        </div>
+    </div>
+
+</body>
+
+</html>

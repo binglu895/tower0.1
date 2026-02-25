@@ -1,0 +1,264 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Comic Style Card Refinement - In-Grid Totem</title>
+    <!-- 引入美漫风格字体 -->
+    <link href="https://fonts.googleapis.com/css2?family=Bangers&family=Anton&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --comic-border: #1A1A1D;
+            --comic-bg: #FDF6E3;
+            --suit-black: #2B2B2B;
+            --suit-red: #FF2A2A;
+            --shadow-dist: 6px;
+        }
+
+        body {
+            background-color: #333;
+            color: white;
+            padding: 40px;
+            font-family: 'Bangers', 'Anton', system-ui, sans-serif;
+        }
+
+        .demo-section {
+            display: flex;
+            flex-direction: column;
+            gap: 20px;
+            margin-bottom: 50px;
+        }
+
+        h2 {
+            border-bottom: 2px solid #555;
+            padding-bottom: 10px;
+        }
+
+        /* --- 核心卡牌样式 --- */
+        .comic-card {
+            position: relative;
+            background-color: var(--comic-bg);
+            border: 4px solid var(--comic-border);
+            border-radius: 12px;
+            box-shadow: var(--shadow-dist) var(--shadow-dist) 0px var(--comic-border);
+            transition: all 0.2s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+            user-select: none;
+            overflow: hidden;
+            display: flex;
+            flex-direction: column;
+            justify-content: space-between;
+        }
+
+        /* 颜色类 */
+        .comic-card.spades,
+        .comic-card.clubs {
+            color: var(--suit-black);
+        }
+
+        .comic-card.hearts,
+        .comic-card.diamonds {
+            color: var(--suit-red);
+        }
+
+        /* 标准布局 (手牌) */
+        .comic-card.standard {
+            width: 140px;
+            height: 200px;
+            padding: 8px;
+        }
+
+        .card-corner {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            line-height: 0.8;
+        }
+
+        .card-corner .rank {
+            font-size: 28px;
+        }
+
+        .card-corner .suit {
+            font-size: 1.2rem;
+        }
+
+        .bottom-right {
+            transform: rotate(180deg);
+            align-self: flex-end;
+        }
+
+        .center-suit {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            font-size: 80px;
+            opacity: 0.9;
+        }
+
+        /* --- 棋盘内托特姆布局 (Totem Style) --- */
+        .grid-cell {
+            width: 80px;
+            height: 80px;
+            background: #2a0845;
+            border: 2px solid #1A1A1D;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+        }
+
+        .comic-card.in-grid {
+            width: 100%;
+            height: 100%;
+            border-radius: 4px;
+            border-width: 2.5px;
+            padding: 0;
+            box-shadow: 2px 2px 0px var(--comic-border);
+            /* 减弱阴影 */
+            display: flex;
+            justify-content: center;
+            align-items: center;
+        }
+
+        /* 隐藏角落 */
+        .comic-card.in-grid .card-corner {
+            display: none;
+        }
+
+        /* 极致清晰中心 */
+        .comic-card.in-grid .totem-center {
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            width: 100%;
+            height: 100%;
+            line-height: 1;
+        }
+
+        /* 数字放大（留呼吸空间） */
+        .comic-card.in-grid .totem-value {
+            font-size: 36px;
+            margin-bottom: -12px;
+            z-index: 2;
+        }
+
+        /* 花色图标 */
+        .comic-card.in-grid .totem-suit {
+            font-size: 28px;
+            opacity: 1;
+        }
+
+        /* ==================================================================
+           黑色花色：美漫终极「双重描边」技法
+           层次结构（由内而外）：
+             ① 黑色字体填充
+             ② 厚白色 text-stroke（内白奶油层）
+             ③ 8方向极小偏移黑色 shadow（外黑框模拟线）
+             ④ 4px 偏移硬阴影（立体感）
+        ================================================================== */
+        .comic-card.in-grid.spades .totem-value,
+        .comic-card.in-grid.clubs .totem-value {
+            color: #000000;
+            -webkit-text-stroke: 4px #FFFFFF;
+            text-shadow:
+                /* ③ 外层黑框：8个方向各 2px，围成一圈 */
+                -2px -2px 0 #000, 2px -2px 0 #000,
+                -2px 2px 0 #000, 2px 2px 0 #000,
+                0px -2px 0 #000, 0px 2px 0 #000,
+                -2px 0px 0 #000, 2px 0px 0 #000,
+                /* ④ 立体硬阴影 */
+                4px 4px 0px #000000;
+        }
+
+        .comic-card.in-grid.spades .totem-suit,
+        .comic-card.in-grid.clubs .totem-suit {
+            color: #000000;
+            -webkit-text-stroke: 3.5px #FFFFFF;
+            text-shadow:
+                -2px -2px 0 #000, 2px -2px 0 #000,
+                -2px 2px 0 #000, 2px 2px 0 #000,
+                0px -2px 0 #000, 0px 2px 0 #000,
+                -2px 0px 0 #000, 2px 0px 0 #000,
+                4px 4px 0px #000000;
+        }
+
+        /* -- 红色花色：细黑描边 + 黑色硬阴影 -- */
+        .comic-card.in-grid.hearts .totem-value,
+        .comic-card.in-grid.diamonds .totem-value {
+            color: #FF2A2A;
+            -webkit-text-stroke: 1.5px #1A1A1D;
+            text-shadow: 3px 3px 0px #1A1A1D;
+        }
+
+        .comic-card.in-grid.hearts .totem-suit,
+        .comic-card.in-grid.diamonds .totem-suit {
+            color: #FF2A2A;
+            -webkit-text-stroke: 1px #1A1A1D;
+            text-shadow: 3px 3px 0px #1A1A1D;
+        }
+
+        /* 标准布局（手牌）角落和中心花色的通用描边；in-grid 有独立规则，不受此影响 */
+        .comic-card.standard .rank,
+        .comic-card.standard .suit,
+        .comic-card.standard .center-suit {
+            -webkit-text-stroke: 1px var(--comic-border);
+        }
+    </style>
+</head>
+
+<body>
+
+    <div class="demo-section">
+        <h2>1. Standard Hand Layout (标准布局)</h2>
+        <div style="display:flex; gap: 20px;">
+            <div class="comic-card standard spades">
+                <div class="card-corner top-left"><span class="rank">8</span><span class="suit">♠</span></div>
+                <div class="center-suit">♠</div>
+                <div class="card-corner bottom-right"><span class="rank">8</span><span class="suit">♠</span></div>
+            </div>
+            <div class="comic-card standard hearts">
+                <div class="card-corner top-left"><span class="rank">A</span><span class="suit">♥</span></div>
+                <div class="center-suit">♥</div>
+                <div class="card-corner bottom-right"><span class="rank">A</span><span class="suit">♥</span></div>
+            </div>
+        </div>
+    </div>
+
+    <div class="demo-section">
+        <h2>2. In-Grid Totem Layout (棋盘托特姆布局 - 极致清晰)</h2>
+        <div style="display:flex; gap: 20px;">
+            <div class="grid-cell">
+                <div class="comic-card in-grid spades">
+                    <div class="totem-center">
+                        <span class="totem-value">8</span>
+                        <span class="totem-suit">♠</span>
+                    </div>
+                </div>
+            </div>
+            <div class="grid-cell">
+                <div class="comic-card in-grid hearts">
+                    <div class="totem-center">
+                        <span class="totem-value">A</span>
+                        <span class="totem-suit">♥</span>
+                    </div>
+                </div>
+            </div>
+            <div class="grid-cell">
+                <div class="comic-card in-grid clubs">
+                    <div class="totem-center">
+                        <span class="totem-value">10</span>
+                        <span class="totem-suit">♣</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <p style="color: #ccc; font-family: sans-serif; font-size: 14px;">
+            * 隐藏了角落冗余信息，数字字号从 28px 提升至 42px，确保在格子里即便缩放也能一眼看清。
+        </p>
+    </div>
+
+</body>
+
+</html>

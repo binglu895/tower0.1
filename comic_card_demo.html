@@ -1,0 +1,162 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Comic Style Poker Card UI</title>
+    <!-- 引入美漫风格字体 -->
+    <link href="https://fonts.googleapis.com/css2?family=Bangers&family=Anton&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --comic-border: #1A1A1D;
+            --comic-bg: #FDF6E3;
+            --suit-black: #2B2B2B;
+            --suit-red: #FF2A2A;
+            --shadow-dist: 6px;
+            --shadow-dist-hover: 14px;
+            --shadow-dist-active: 2px;
+        }
+
+        body {
+            background-color: #333;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+            margin: 0;
+            font-family: 'Bangers', 'Anton', system-ui, sans-serif;
+        }
+
+        /* 扑克卡牌容器 */
+        .poker-card {
+            position: relative;
+            width: 240px;
+            height: 340px;
+            background-color: var(--comic-bg);
+            border: 4px solid var(--comic-border);
+            border-radius: 12px;
+            padding: 15px;
+            box-sizing: border-box;
+            cursor: pointer;
+
+            /* 硬阴影 - 初始状态 */
+            box-shadow: var(--shadow-dist) var(--shadow-dist) 0px var(--comic-border);
+
+            /* 动效过渡 */
+            transition: transform 0.2s cubic-bezier(0.175, 0.885, 0.32, 1.275),
+                box-shadow 0.2s ease-out;
+
+            display: flex;
+            flex-direction: column;
+            justify-content: space-between;
+            user-select: none;
+        }
+
+        /* 颜色类 */
+        .poker-card.spades,
+        .poker-card.clubs {
+            color: var(--suit-black);
+        }
+
+        .poker-card.hearts,
+        .poker-card.diamonds {
+            color: var(--suit-red);
+        }
+
+        /* 交互动效 - 悬停 (反重力) */
+        .poker-card:hover {
+            transform: translateY(-15px) rotate(-3deg) scale(1.05);
+            box-shadow: 12px var(--shadow-dist-hover) 0px var(--comic-border);
+        }
+
+        /* 交互动效 - 按下 (物理重压) */
+        .poker-card:active {
+            transform: translateY(4px) rotate(0deg) scale(0.98);
+            box-shadow: var(--shadow-dist-active) var(--shadow-dist-active) 0px var(--comic-border);
+        }
+
+        /* 角隅数字与花色 */
+        .card-corner {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            line-height: 0.9;
+        }
+
+        .card-corner .rank {
+            font-size: 42px;
+            letter-spacing: -2px;
+        }
+
+        .card-corner .suit {
+            font-size: 1.8rem;
+            margin-top: -5px;
+        }
+
+        .top-left {
+            align-self: flex-start;
+        }
+
+        .bottom-right {
+            align-self: flex-end;
+            transform: rotate(180deg);
+        }
+
+        /* 中心巨大花色 */
+        .center-suit {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            font-size: 120px;
+            /* 稍微偏移模拟印刷不精准感 */
+            margin-top: 5px;
+            opacity: 0.95;
+            filter: drop-shadow(4px 4px 0px rgba(0, 0, 0, 0.1));
+        }
+
+        /* 文字阴影增加对比度，模拟印刷感 */
+        .rank,
+        .suit,
+        .center-suit {
+            -webkit-text-stroke: 1px var(--comic-border);
+        }
+    </style>
+</head>
+
+<body>
+
+    <!-- 黑桃 8 示例 -->
+    <div class="poker-card spades">
+        <div class="card-corner top-left">
+            <span class="rank">8</span>
+            <span class="suit">♠</span>
+        </div>
+
+        <div class="center-suit">♠</div>
+
+        <div class="card-corner bottom-right">
+            <span class="rank">8</span>
+            <span class="suit">♠</span>
+        </div>
+    </div>
+
+    <!-- 红桃 A 示例 (通过 class 切换颜色) -->
+    <div class="poker-card hearts" style="margin-left: 50px;">
+        <div class="card-corner top-left">
+            <span class="rank">A</span>
+            <span class="suit">♥</span>
+        </div>
+
+        <div class="center-suit">♥</div>
+
+        <div class="card-corner bottom-right">
+            <span class="rank">A</span>
+            <span class="suit">♥</span>
+        </div>
+    </div>
+
+</body>
+
+</html>

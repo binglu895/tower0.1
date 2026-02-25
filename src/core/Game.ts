@@ -1,6 +1,10 @@
+import { LAYOUT } from '../styles/layout';
+import { Renderer, RenderState, NoticeAsset } from './Renderer';
+
 export class Game {
     private canvas: HTMLCanvasElement;
-    private ctx: CanvasRenderingContext2D;
+    private ctx!: CanvasRenderingContext2D;
+    private renderer!: Renderer;
 
     private readonly GAME_WIDTH = 450;
     private readonly GAME_HEIGHT = 800;
@@ -28,9 +32,10 @@ export class Game {
     private readonly SUITS = ['♠', '♥', '♣', '♦'];
     private readonly VALUES = ['A', '2', '3', '4', '5', '6', '7', '8', '9', '10', 'J', 'Q', 'K'];
 
-    private readonly DEF_START_Y = 240;
-    private readonly DEF_HEIGHT = 300;
-    private readonly OP_START_Y = 660;
+    // 布局及样式常量全部从 modular styles 引入
+    private readonly DEF_START_Y = LAYOUT.AREAS.GRID.startY;
+    private readonly DEF_HEIGHT = LAYOUT.AREAS.GRID.height;
+    private readonly OP_START_Y = LAYOUT.AREAS.OPERATION.startY;
 
     private enemies: any[] = [];
     private projectiles: any[] = [];
@@ -49,12 +54,32 @@ export class Game {
     private dragPos: { x: number, y: number } | null = null;
 
     private towerCooldowns: Map<string, number> = new Map();
+    private hoverIndex: number = -1;
+    private hoveredButton: string | null = null;
+
+    // 状态栏动画追踪
+    private prevHp: number = 0;
+    private prevGold: number = 0;
+    private prevDeckSize: number = 0;
+    private hpPopTimer: number = 0;
+    private goldPopTimer: number = 0;
+    private deckPopTimer: number = 0;
+
+    // 悬停塔提示与战斗飘字
+    private hoveredTower: { r: number, c: number } | null = null;
+    private tooltipTimer: number = 0;
+    private boomEffects: { x: number, y: number, text: string, progress: number, color: string }[] = [];
+
+    private noticeAsset: NoticeAsset | undefined = undefined;
+    private assets: Map<string, HTMLImageElement> = new Map();
 
     constructor(canvasId: string) {
         this.canvas = document.getElementById(canvasId) as HTMLCanvasElement;
         this.ctx = this.canvas.getContext('2d') as CanvasRenderingContext2D;
         this.canvas.width = this.GAME_WIDTH;
         this.canvas.height = this.GAME_HEIGHT;
+
+        this.renderer = new Renderer(this.ctx);
 
         this.canvas.addEventListener('mousedown', this.handleStart);
         this.canvas.addEventListener('mousemove', this.handleMove);
@@ -77,6 +102,19 @@ export class Game {
         this.resetGame();
         requestAnimationFrame(this.gameLoop);
     }
+
+    protected async loadImage(key: string, url: string): Promise<HTMLImageElement> {
+        return new Promise((resolve, reject) => {
+            const img = new Image();
+            img.onload = () => {
+                this.assets.set(key, img);
+                resolve(img);
+            };
+            img.onerror = reject;
+            img.src = url;
+        });
+    }
+
 
     private resetGame() {
         this.hp = 3;
@@ -102,7 +140,10 @@ export class Game {
         this.remainingToSpawn = 0;
         this.isCountdownActive = false;
 
+        this.prevHp = this.hp;
+        this.prevGold = this.gold;
         this.initDeck();
+        this.prevDeckSize = this.deck.length + this.cards.filter(c => c !== null).length;
         this.refreshCards();
     }
 
@@ -227,7 +268,8 @@ export class Game {
         if (this.gameOver) {
             if (x >= 125 && x <= 325 && y >= 450 && y <= 500) {
                 this.playSound(600, 'sine', 0.2, 0.1);
-                this.resetGame();
+                this.setPressedButton('restart');
+                setTimeout(() => this.resetGame(), 150);
             }
             return;
         }
@@ -260,6 +302,7 @@ export class Game {
                 const cx = cardsStartX + i * (cardWidth + gap);
                 if (x >= cx && x <= cx + cardWidth && this.cards[i]) {
                     this.draggingIndex = i;
+                    this.hoverIndex = -1; // 强制重置，确保立即触发全域引导
                     this.dragPos = { x, y };
                     this.playSound(330, 'sine', 0.05, 0.05);
                     return;
@@ -291,8 +334,75 @@ export class Game {
     }
 
     private handleMove = (e: MouseEvent) => {
-        if (this.gameOver || this.draggingIndex === -1) return;
-        this.dragPos = this.getMousePos(e);
+        if (this.gameOver) return;
+        const pos = this.getMousePos(e);
+        const { x, y } = pos;
+
+        if (this.draggingIndex === -1) {
+            // 检测备选卡牌悬停
+            const cardWidth = 60, cardHeight = 85, gap = 20;
+            const cardsStartX = (this.GAME_WIDTH - (cardWidth * 3 + gap * 2)) / 2;
+            const cardsY = this.OP_START_Y + 10;
+
+            let foundHover = -1;
+            let foundBtnHover: string | null = null;
+
+            if (y >= cardsY && y <= cardsY + cardHeight) {
+                for (let i = 0; i < 3; i++) {
+                    const cx = cardsStartX + i * (cardWidth + gap);
+                    if (x >= cx && x <= cx + cardWidth && this.cards[i]) {
+                        foundHover = i;
+                        break;
+                    }
+                }
+            }
+
+            if (this.gameOver) {
+                if (x >= 125 && x <= 325 && y >= 450 && y <= 500) foundBtnHover = 'restart';
+            } else {
+                const btnY = this.OP_START_Y + 105;
+                if (y >= btnY && y <= btnY + 38) {
+                    if (x >= 50 && x <= 200) foundBtnHover = 'refresh';
+                    else if (x >= this.GAME_WIDTH - 200 && x <= this.GAME_WIDTH - 50) foundBtnHover = 'next_wave';
+                }
+            }
+
+            if (this.hoverIndex !== foundHover) this.hoverIndex = foundHover;
+            if (this.hoveredButton !== foundBtnHover) this.hoveredButton = foundBtnHover;
+        } else {
+            this.dragPos = pos;
+
+            // 拖拽时检测格点悬停
+            const gridConfig = LAYOUT.AREAS.GRID;
+            const startX = gridConfig.startX ?? 0;
+            const gridWidth = gridConfig.width ?? this.GAME_WIDTH;
+            const cellWidth = gridWidth / 4, cellHeight = gridConfig.height / 5;
+
+            if (y >= gridConfig.startY && y <= gridConfig.startY + gridConfig.height) {
+                const col = Math.floor((x - startX) / cellWidth);
+                const row = Math.floor((y - gridConfig.startY) / cellHeight);
+                if (row >= 0 && row < 5 && col >= 0 && col < 4 && x >= startX && x <= startX + gridWidth) {
+                    this.hoverIndex = row * 4 + col;
+
+                    // 塔提示检测 (仅在非拖拽且悬停在已放置的塔上时)
+                    const tower = this.defenseGrid[row][col];
+                    if (tower && this.draggingIndex === -1) {
+                        if (!this.hoveredTower || this.hoveredTower.r !== row || this.hoveredTower.c !== col) {
+                            this.hoveredTower = { r: row, c: col };
+                            this.tooltipTimer = 0;
+                        }
+                    } else {
+                        this.hoveredTower = null;
+                    }
+                } else {
+                    this.hoverIndex = -1;
+                    this.hoveredTower = null;
+                }
+            } else {
+                this.hoverIndex = -1;
+                this.hoveredTower = null;
+            }
+        }
     };
 
     private handleEnd = (e: MouseEvent) => {
@@ -300,13 +410,16 @@ export class Game {
         const pos = this.getMousePos(e);
         const { x, y } = pos;
 
-        const cellWidth = this.GAME_WIDTH / 4, cellHeight = this.DEF_HEIGHT / 5;
+        const gridConfig = LAYOUT.AREAS.GRID;
+        const startX = gridConfig.startX ?? 0;
+        const gridWidth = gridConfig.width ?? this.GAME_WIDTH;
+        const cellWidth = gridWidth / 4, cellHeight = gridConfig.height / 5;
 
-        if (y >= this.DEF_START_Y && y <= this.DEF_START_Y + this.DEF_HEIGHT) {
-            const col = Math.floor(x / cellWidth);
-            const row = Math.floor((y - this.DEF_START_Y) / cellHeight);
+        if (y >= gridConfig.startY && y <= gridConfig.startY + gridConfig.height) {
+            const col = Math.floor((x - startX) / cellWidth);
+            const row = Math.floor((y - gridConfig.startY) / cellHeight);
 
-            if (row >= 0 && row < 5 && col >= 0 && col < 4) {
+            if (row >= 0 && row < 5 && col >= 0 && col < 4 && x >= startX && x <= startX + gridWidth) {
                 const card = this.cards[this.draggingIndex];
                 if (!card) return;
                 const existing = this.defenseGrid[row][col];
@@ -325,7 +438,7 @@ export class Game {
                     existing.cardCount = (existing.cardCount || 1) + 1;
                     this.cards[this.draggingIndex] = null;
                     this.playSound(880, 'sine', 0.1, 0.2);
-                    this.burstParticles(col * cellWidth + cellWidth / 2, this.DEF_START_Y + row * cellHeight + cellHeight / 2, '#f1c40f');
+                    this.burstParticles(startX + col * cellWidth + cellWidth / 2, gridConfig.startY + row * cellHeight + cellHeight / 2, '#f1c40f');
                     this.checkOmniMerge(row, col);
                     this.refreshCards();
                     if (!this.hasPlacedFirstCard) {
@@ -434,6 +547,28 @@ export class Game {
         if (this.gameOver) return;
         const now = Date.now();
 
+        // 状态变化检测 (用于徽章 POP 动画)
+        if (this.hp !== this.prevHp) { this.hpPopTimer = 15; this.prevHp = this.hp; }
+        if (this.gold !== this.prevGold) { this.goldPopTimer = 15; this.prevGold = this.gold; }
+        const currentDeckSize = this.deck.length + this.cards.filter(c => c !== null).length;
+        if (currentDeckSize !== this.prevDeckSize) { this.deckPopTimer = 15; this.prevDeckSize = currentDeckSize; }
+
+        if (this.hpPopTimer > 0) this.hpPopTimer--;
+        if (this.goldPopTimer > 0) this.goldPopTimer--;
+        if (this.deckPopTimer > 0) this.deckPopTimer--;
+
+        if (this.hoveredTower && this.tooltipTimer < 15) {
+            this.tooltipTimer++;
+        }
+
+        // 爆炸效果逻辑
+        for (let i = this.boomEffects.length - 1; i >= 0; i--) {
+            this.boomEffects[i].progress += 0.025;
+            if (this.boomEffects[i].progress >= 1) {
+                this.boomEffects.splice(i, 1);
+            }
+        }
+
         if (this.isCountdownActive) {
             if (now - this.lastCountdownSnapshot >= 1000) {
                 this.countdownSeconds--;
@@ -514,6 +649,7 @@ export class Game {
             if (dist < 10) {
                 p.target.hp -= p.damage;
                 if (p.target.hp <= 0) {
+                    this.addBoom(p.target.x, p.target.y, 'BOOM!', Math.random() > 0.5 ? '#FFEA00' : '#FF007F');
                     const idx = this.enemies.indexOf(p.target);
                     if (idx !== -1) {
                         this.waveKillDistSum += p.target.t; this.waveEnemiesKilled++;
@@ -533,119 +669,55 @@ export class Game {
     }
 
     private getPathPos(t: number) {
-        const top = 180, bottom = 600, left = 20, right = this.GAME_WIDTH - 20;
+        const pathArea = LAYOUT.AREAS.PATH;
+        const transArea = LAYOUT.AREAS.TRANSITION;
+        const top = pathArea.startY;
+        const bottom = transArea.startY + transArea.height;
+        const left = 20, right = this.GAME_WIDTH - 20;
+
         if (t < 0.25) return { x: left + (t / 0.25) * (right - left), y: top };
         else if (t < 0.5) return { x: right, y: top + ((t - 0.25) / 0.25) * (bottom - top) };
         else if (t < 0.75) return { x: right - ((t - 0.5) / 0.25) * (right - left), y: bottom };
-        else return { x: left, y: bottom - ((t - 0.75) / 0.25) * (bottom - 180 + 100) };
+        else return { x: left, y: bottom - ((t - 0.75) / 0.25) * (bottom - top) };
     }
 
     private render() {
-        this.ctx.fillStyle = '#1c1c1e';
-        this.ctx.fillRect(0, 0, this.GAME_WIDTH, this.GAME_HEIGHT);
-        this.drawPathBg();
-        this.drawTopBar();
-        this.drawDefenseArea();
-        this.drawEntities();
-        this.drawOperationArea();
+        const renderState: RenderState = {
+            hp: this.hp,
+            gold: this.gold,
+            wave: this.wave,
+            deckSize: this.deck.length + this.cards.filter(c => c !== null).length,
+            cards: this.cards,
+            defenseGrid: this.defenseGrid,
+            draggingIndex: this.draggingIndex,
+            dragPos: this.dragPos,
+            hoverIndex: this.hoverIndex,
+            hoveredButton: this.hoveredButton,
+            pressedButton: this.pressedButton,
+            hasPlacedFirstCard: this.hasPlacedFirstCard,
+            gameOver: this.gameOver,
+            hpPopTimer: this.hpPopTimer,
+            goldPopTimer: this.goldPopTimer,
+            deckPopTimer: this.deckPopTimer,
+            tooltipTimer: this.tooltipTimer,
+            hoveredTower: this.hoveredTower,
+            enemies: this.enemies,
+            projectiles: this.projectiles,
+            particles: this.particles,
+            boomEffects: this.boomEffects,
+            difficultyFactor: this.difficultyFactor,
+            isCountdownActive: this.isCountdownActive,
+            countdownSeconds: this.countdownSeconds,
+            noticeAsset: this.noticeAsset
+        };
 
-        if (!this.hasPlacedFirstCard && !this.gameOver) {
-            this.ctx.fillStyle = 'rgba(0, 0, 0, 0.4)';
-            this.ctx.fillRect(0, 180, this.GAME_WIDTH, 420);
-            this.ctx.fillStyle = '#f1c40f';
-            this.ctx.font = 'bold 20px Courier New';
-            this.ctx.textAlign = 'center';
-            this.ctx.fillText('放置第一张牌以开始', this.GAME_WIDTH / 2, 400);
-        }
-
-        if (this.gameOver) { this.drawGameOver(); }
-        else if (this.difficultyFactor > 2) { this.ctx.strokeStyle = '#ff000022'; this.ctx.lineWidth = 4; this.ctx.strokeRect(0, 0, this.GAME_WIDTH, this.GAME_HEIGHT); }
+        this.renderer.render(renderState);
     }
 
-    private drawGameOver() {
-        this.ctx.fillStyle = 'rgba(0, 0, 0, 0.85)'; this.ctx.fillRect(0, 0, this.GAME_WIDTH, this.GAME_HEIGHT);
-        this.ctx.fillStyle = '#e74c3c'; this.ctx.font = 'bold 42px Courier New'; this.ctx.textAlign = 'center'; this.ctx.fillText('GAME OVER', this.GAME_WIDTH / 2, 320);
-        this.ctx.fillStyle = '#ffffff'; this.ctx.font = '20px Courier New'; this.ctx.fillText(`最终波次: ${this.wave}`, this.GAME_WIDTH / 2, 380);
-        this.ctx.fillText(`剩余金币: ${this.gold}G`, this.GAME_WIDTH / 2, 410);
-        this.drawButton(this.GAME_WIDTH / 2 - 100, 450, 200, 50, '重新开始', '#27ae60');
+
+
+    private addBoom(x: number, y: number, text: string, color: string) {
+        this.boomEffects.push({ x, y, text, progress: 0, color });
     }
 
-    private drawPathBg() {
-        const top = 180, bottom = 600, left = 20, right = this.GAME_WIDTH - 20;
-        this.ctx.strokeStyle = '#2c2c2e'; this.ctx.lineWidth = 30; this.ctx.lineJoin = 'round';
-        this.ctx.beginPath(); this.ctx.moveTo(left, top); this.ctx.lineTo(right, top); this.ctx.lineTo(right, bottom); this.ctx.lineTo(left, bottom); this.ctx.lineTo(left, top); this.ctx.stroke();
-    }
-
-    private drawTopBar() {
-        this.ctx.fillStyle = '#0a0a0acc'; this.ctx.fillRect(0, 0, this.GAME_WIDTH, 48);
-        this.ctx.fillStyle = '#eee'; this.ctx.font = 'bold 14px Courier New';
-        this.ctx.textAlign = 'left'; this.ctx.fillText(`生命:${this.hp}`, 12, 28);
-        this.ctx.textAlign = 'center';
-        const totalCardsInDeck = this.deck.length + this.cards.filter(c => c !== null).length;
-        const deckColor = totalCardsInDeck < 10 ? '#ff4444' : '#fff';
-        this.ctx.fillStyle = deckColor; this.ctx.fillText(`余牌:${totalCardsInDeck}`, this.GAME_WIDTH / 2, 28);
-        this.ctx.fillStyle = '#eee'; this.ctx.textAlign = 'right'; this.ctx.fillText(`金币:${this.gold}`, this.GAME_WIDTH - 12, 28);
-    }
-
-    private drawDefenseArea() {
-        const cellWidth = this.GAME_WIDTH / 4, cellHeight = this.DEF_HEIGHT / 5;
-        this.ctx.strokeStyle = '#333'; this.ctx.lineWidth = 1;
-        for (let r = 0; r < 5; r++) {
-            for (let c = 0; c < 4; c++) {
-                const x = c * cellWidth, y = this.DEF_START_Y + r * cellHeight;
-                this.ctx.strokeRect(x, y, cellWidth, cellHeight);
-                const tower = this.defenseGrid[r][c];
-                if (tower) {
-                    this.drawCard(this.ctx, x + 5, y + 5, tower.suit, tower.value, cellWidth - 10, cellHeight - 10, 10);
-                    if (tower.handName) { this.ctx.fillStyle = '#f1c40f'; this.ctx.font = 'bold 9px Arial'; this.ctx.textAlign = 'center'; this.ctx.fillText(tower.handName, x + cellWidth / 2, y + cellHeight - 6); }
-                    if (tower.level > 1) { this.ctx.fillStyle = '#1c1c1e'; this.ctx.globalAlpha = 0.8; this.ctx.fillRect(x + cellWidth - 30, y + 5, 25, 11); this.ctx.globalAlpha = 1.0; this.ctx.fillStyle = '#f1c40f'; this.ctx.font = 'bold 9px Arial'; this.ctx.textAlign = 'right'; this.ctx.fillText(`L${tower.level}`, x + cellWidth - 8, y + 14); }
-                }
-            }
-        }
-    }
-
-    private drawEntities() {
-        for (const enemy of this.enemies) {
-            this.ctx.fillStyle = '#ff4444'; this.ctx.beginPath(); this.ctx.arc(enemy.x, enemy.y, 11, 0, Math.PI * 2); this.ctx.fill();
-            const hpWidth = 26; this.ctx.fillStyle = '#440000'; this.ctx.fillRect(enemy.x - hpWidth / 2, enemy.y - 20, hpWidth, 4);
-            this.ctx.fillStyle = '#00ff00'; this.ctx.fillRect(enemy.x - hpWidth / 2, enemy.y - 20, hpWidth * (enemy.hp / enemy.maxHp), 4);
-        }
-        for (const p of this.projectiles) { this.ctx.fillStyle = '#f1c40f'; this.ctx.beginPath(); this.ctx.arc(p.x, p.y, 5, 0, Math.PI * 2); this.ctx.fill(); }
-        for (const part of this.particles) { this.ctx.fillStyle = part.color; this.ctx.globalAlpha = part.life / 40; this.ctx.fillRect(part.x, part.y, 3, 3); this.ctx.globalAlpha = 1.0; }
-    }
-
-    private drawOperationArea() {
-        const cardWidth = 66, cardHeight = 92, gap = 20;
-        const xOffset = (this.GAME_WIDTH - (cardWidth * 3 + gap * 2)) / 2;
-        this.ctx.fillStyle = '#111'; this.ctx.fillRect(0, this.OP_START_Y, this.GAME_WIDTH, this.GAME_HEIGHT - this.OP_START_Y);
-        for (let i = 0; i < 3; i++) {
-            const card = this.cards[i];
-            const cx = xOffset + i * (cardWidth + gap), cy = this.OP_START_Y + 10;
-            if (card && this.draggingIndex !== i) this.drawCard(this.ctx, cx, cy, card.suit, card.value, cardWidth, cardHeight);
-            else if (!card) { this.ctx.strokeStyle = '#222'; this.ctx.strokeRect(cx, cy, cardWidth, cardHeight); }
-        }
-        if (this.draggingIndex !== -1 && this.dragPos) {
-            const card = this.cards[this.draggingIndex]!;
-            this.drawCard(this.ctx, this.dragPos.x - 33, this.dragPos.y - 46, card.suit, card.value, 66, 92);
-        }
-        const btnY = this.OP_START_Y + 105;
-        this.drawButton(50, btnY, 150, 38, `🔄 刷新 (${this.refreshCost}G)`, this.pressedButton === 'refresh' ? '#f1c40f' : '#333');
-        let nextWaveText = this.hasPlacedFirstCard ? '▶ 下一波' : '⏳ 准备中';
-        if (this.isCountdownActive) nextWaveText = `⌛ 自动开始 (${this.countdownSeconds}s)`;
-        this.drawButton(this.GAME_WIDTH - 200, btnY, 150, 38, nextWaveText, this.pressedButton === 'next_wave' ? '#f39c12' : (this.hasPlacedFirstCard ? '#27ae60' : '#555'));
-    }
-
-    public drawCard(ctx: CanvasRenderingContext2D, x: number, y: number, suit: string, value: string, width: number, height: number, fontSize: number = 20) {
-        ctx.fillStyle = '#ffffff'; ctx.beginPath(); ctx.roundRect(x, y, width, height, 8); ctx.fill();
-        ctx.strokeStyle = '#000000'; ctx.lineWidth = 1; ctx.stroke();
-        const isRed = suit === '♥' || suit === '♦'; ctx.fillStyle = isRed ? '#d32f2f' : '#000000'; ctx.textAlign = 'left'; ctx.textBaseline = 'top'; ctx.font = `bold ${fontSize}px Courier New`;
-        ctx.fillText(value, x + width * 0.1, y + height * 0.08); ctx.font = `${fontSize * 0.8}px Courier New`; ctx.fillText(suit, x + width * 0.1, y + height * 0.3);
-        ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.font = `${fontSize * 2.2}px Courier New`; ctx.fillText(suit, x + width / 2, y + height / 2 + 7);
-    }
-
-    private drawButton(x: number, y: number, w: number, h: number, text: string, color: string) {
-        this.ctx.fillStyle = color; this.ctx.beginPath(); this.ctx.roundRect(x, y, w, h, 10); this.ctx.fill();
-        this.ctx.fillStyle = '#ffffff'; this.ctx.textAlign = 'center'; this.ctx.textBaseline = 'middle'; this.ctx.font = 'bold 11px Courier New';
-        this.ctx.fillText(text, x + w / 2, y + h / 2);
-    }
 }
