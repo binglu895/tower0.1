@@ -708,7 +708,8 @@ export class Game {
             difficultyFactor: this.difficultyFactor,
             isCountdownActive: this.isCountdownActive,
             countdownSeconds: this.countdownSeconds,
-            noticeAsset: this.noticeAsset
+            noticeAsset: this.noticeAsset,
+            refreshCost: this.refreshCost
         };
 
         this.renderer.render(renderState);

@@ -40,6 +40,7 @@ export interface RenderState {
     isCountdownActive: boolean;
     countdownSeconds: number;
     noticeAsset?: NoticeAsset;
+    refreshCost: number;
 }
 
 export class Renderer {
@@ -376,7 +377,7 @@ export class Renderer {
         const btnY = opConfig.startY + 105;
 
         const refreshState = state.pressedButton === 'refresh' ? 'active' : (state.hoveredButton === 'refresh' ? 'hover' : 'normal');
-        this.drawButton(50, btnY, 150, 38, `🔄 REFRESH (5G)`, COLORS.NEON_CYAN, refreshState);
+        this.drawButton(50, btnY, 150, 38, `🔄 REFRESH (${state.refreshCost}G)`, COLORS.NEON_CYAN, refreshState);
 
         let nextWaveText = state.hasPlacedFirstCard ? '▶ NEXT WAVE' : '⏳ PREPARING';
         if (state.isCountdownActive) nextWaveText = `⌛ AUTO (${state.countdownSeconds}s)`;
