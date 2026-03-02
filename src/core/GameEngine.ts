@@ -1,3 +1,5 @@
+import { PathManager } from './PathManager';
+
 export interface GameEvent {
     type: 'sound' | 'effect' | 'state_change';
     name: string;
@@ -30,6 +32,7 @@ export class GameEngine {
     private waveKillDistSum: number = 0;
     private waveEnemiesKilled: number = 0;
     private towerCooldowns: Map<string, number> = new Map();
+    private nextEnemyId: number = 0;
 
     private readonly SUITS = ['♠', '♥', '♣', '♦'];
     private readonly VALUES = ['A', '2', '3', '4', '5', '6', '7', '8', '9', '10', 'J', 'Q', 'K'];
@@ -64,6 +67,7 @@ export class GameEngine {
         this.towerCooldowns.clear();
         this.remainingToSpawn = 0;
         this.isCountdownActive = false;
+        this.nextEnemyId = 0;
 
         this.initDeck();
         this.refreshCards();
@@ -269,8 +273,9 @@ export class GameEngine {
 
         if (this.remainingToSpawn > 0 && now - this.lastSpawnTime > 700 / Math.pow(this.difficultyFactor, 0.2)) {
             const baseHp = 6 + this.wave * 2;
+            const id = `enemy-${this.nextEnemyId++}`;
             this.enemies.push({
-                t: 0, hp: baseHp * this.difficultyFactor, maxHp: baseHp * this.difficultyFactor,
+                id, t: 0, hp: baseHp * this.difficultyFactor, maxHp: baseHp * this.difficultyFactor,
                 speed: (0.0016 + Math.random() * 0.0006) * Math.pow(this.difficultyFactor, 0.1)
             });
             this.remainingToSpawn--;
@@ -319,8 +324,10 @@ export class GameEngine {
 
                 if (now - (this.towerCooldowns.get(towerId) || 0) > 800 / speedMul) {
                     let closestEnemy = null, minDist = 135 + (tower.level * 4) + ((tower.cardCount || 1) * 35);
-                    const tx = c * (450 / 4) + (450 / 8); // Approximate, engine doesn't need pixel perfect but here for logic
-                    const ty = 413 + r * (255 / 5) + (255 / 10); // Approximate based on LAYOUT
+                    const startX = 40, gridWidth = 370;
+                    const startY = 240, gridHeight = 300;
+                    const tx = startX + c * (gridWidth / 4) + (gridWidth / 8);
+                    const ty = startY + r * (gridHeight / 5) + (gridHeight / 10);
 
                     for (const enemy of this.enemies) {
                         const dist = Math.sqrt((enemy.x - tx) ** 2 + (enemy.y - ty) ** 2);
@@ -342,8 +349,10 @@ export class GameEngine {
             // Calculate pixel positions for distance check
             // Note: In a true separate backend, we'd use grid coords or a separate physics space.
             // For now, we continue using approximated pixels to match current logic.
-            const tx = p.c * (450 / 4) + (450 / 8);
-            const ty = 413 + p.r * (255 / 5) + (255 / 10);
+            const startX = 40, gridWidth = 370;
+            const startY = 240, gridHeight = 300;
+            const tx = startX + p.c * (gridWidth / 4) + (gridWidth / 8);
+            const ty = startY + p.r * (gridHeight / 5) + (gridHeight / 10);
 
             if (!p.x) { p.x = tx; p.y = ty; }
 
@@ -369,15 +378,6 @@ export class GameEngine {
     }
 
     private getPathPos(t: number) {
-        // Path logic duplicated here to keep Engine pure and independent of LAYOUT imports if needed
-        // These values match LAYOUT.AREAS.PATH and TRANSITION
-        const top = 110; // NOTICE height (80) + STATUS_BAR height (30)
-        const bottom = 413; // PATH height (278) + top (110) + TRANSITION height (25)
-        const left = 20, right = 430; // 450 - 20
-
-        if (t < 0.25) return { x: left + (t / 0.25) * (right - left), y: top };
-        else if (t < 0.5) return { x: right, y: top + ((t - 0.25) / 0.25) * (bottom - top) };
-        else if (t < 0.75) return { x: right - ((t - 0.5) / 0.25) * (right - left), y: bottom };
-        else return { x: left, y: bottom - ((t - 0.75) / 0.25) * (bottom - top) };
+        return PathManager.getPosition(t);
     }
 }

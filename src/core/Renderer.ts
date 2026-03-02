@@ -1,5 +1,7 @@
 import { COLORS } from '../styles/colors';
 import { LAYOUT } from '../styles/layout';
+import { SpriteManager } from './SpriteManager';
+import { PathManager } from './PathManager';
 
 export interface NoticeAsset {
     type: 'static' | 'tilemap' | 'animation';
@@ -41,6 +43,8 @@ export interface RenderState {
     countdownSeconds: number;
     noticeAsset?: NoticeAsset;
     refreshCost: number;
+    assets: Map<string, HTMLImageElement>;
+    spriteManager: SpriteManager;
 }
 
 export class Renderer {
@@ -242,23 +246,17 @@ export class Renderer {
     }
 
     private drawPathTrail() {
-        const pathConfig = LAYOUT.AREAS.PATH;
-        const transConfig = LAYOUT.AREAS.TRANSITION;
-
-        // Path starts at the beginning of the PATH area and ends at the end of the TRANSITION area
-        const top = pathConfig.startY;
-        const bottom = transConfig.startY + transConfig.height;
-        const left = 20, right = this.GAME_WIDTH - 20;
+        const corners = PathManager.getPathCorners();
 
         this.ctx.save();
         this.ctx.strokeStyle = COLORS.BORDER;
         this.ctx.lineWidth = 34;
         this.ctx.lineJoin = 'round';
         this.ctx.beginPath();
-        this.ctx.moveTo(left, top);
-        this.ctx.lineTo(right, top);
-        this.ctx.lineTo(right, bottom);
-        this.ctx.lineTo(left, bottom);
+        this.ctx.moveTo(corners[0].x, corners[0].y);
+        for (let i = 1; i < corners.length; i++) {
+            this.ctx.lineTo(corners[i].x, corners[i].y);
+        }
         this.ctx.closePath();
         this.ctx.stroke();
 
@@ -388,10 +386,16 @@ export class Renderer {
     }
 
     private drawEntities(state: RenderState) {
+        state.spriteManager.draw(this.ctx, state.assets);
+
         for (const enemy of state.enemies) {
-            this.ctx.fillStyle = '#ff4444'; this.ctx.beginPath(); this.ctx.arc(enemy.x, enemy.y, 11, 0, Math.PI * 2); this.ctx.fill();
-            const hpWidth = 26; this.ctx.fillStyle = '#440000'; this.ctx.fillRect(enemy.x - hpWidth / 2, enemy.y - 20, hpWidth, 4);
-            this.ctx.fillStyle = '#00ff00'; this.ctx.fillRect(enemy.x - hpWidth / 2, enemy.y - 20, hpWidth * (enemy.hp / enemy.maxHp), 4);
+            // Keep existing simple enemy render for now if they are not yet in SpriteManager
+            // In the next step, we will fully migrate them.
+            if (!state.spriteManager.get(enemy.id)) {
+                this.ctx.fillStyle = '#ff4444'; this.ctx.beginPath(); this.ctx.arc(enemy.x, enemy.y, 11, 0, Math.PI * 2); this.ctx.fill();
+                const hpWidth = 26; this.ctx.fillStyle = '#440000'; this.ctx.fillRect(enemy.x - hpWidth / 2, enemy.y - 20, hpWidth, 4);
+                this.ctx.fillStyle = '#00ff00'; this.ctx.fillRect(enemy.x - hpWidth / 2, enemy.y - 20, hpWidth * (enemy.hp / enemy.maxHp), 4);
+            }
         }
         for (const p of state.projectiles) { this.ctx.fillStyle = '#f1c40f'; this.ctx.beginPath(); this.ctx.arc(p.x, p.y, 5, 0, Math.PI * 2); this.ctx.fill(); }
         for (const part of state.particles) { this.ctx.fillStyle = part.color; this.ctx.globalAlpha = part.life / 40; this.ctx.fillRect(part.x, part.y, 3, 3); this.ctx.globalAlpha = 1.0; }

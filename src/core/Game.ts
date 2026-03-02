@@ -1,12 +1,15 @@
 import { LAYOUT } from '../styles/layout';
 import { Renderer, RenderState, NoticeAsset } from './Renderer';
 import { GameEngine, GameEvent } from './GameEngine';
+import { SpriteManager } from './SpriteManager';
+import { EnemySprite } from './EnemySprite';
 
 export class Game {
     private canvas: HTMLCanvasElement;
     private ctx!: CanvasRenderingContext2D;
     private renderer!: Renderer;
     private engine: GameEngine;
+    private spriteManager: SpriteManager;
 
     private readonly GAME_WIDTH = 450;
     private readonly GAME_HEIGHT = 800;
@@ -50,6 +53,7 @@ export class Game {
 
         this.renderer = new Renderer(this.ctx);
         this.engine = new GameEngine(this.handleEngineEvent.bind(this));
+        this.spriteManager = new SpriteManager();
 
         this.canvas.addEventListener('mousedown', this.handleStart);
         this.canvas.addEventListener('mousemove', this.handleMove);
@@ -98,6 +102,7 @@ export class Game {
     }
 
     private resetVisuals() {
+        this.spriteManager.clear();
         this.prevHp = this.engine.hp;
         this.prevGold = this.engine.gold;
         this.prevDeckSize = this.engine.deck.length + this.engine.cards.filter(c => c !== null).length;
@@ -337,7 +342,30 @@ export class Game {
         const now = Date.now();
         this.engine.update(now);
 
-        // UI animations
+        // Synchronize Engine Enemies with Sprites
+        const currentEnemyIds = new Set(this.engine.enemies.map(e => e.id));
+
+        // Remove dead enemies
+        const allSpriteIds = this.spriteManager.getAllIds();
+        for (const id of allSpriteIds) {
+            if (id.startsWith('enemy-') && !currentEnemyIds.has(id)) {
+                this.spriteManager.remove(id);
+            }
+        }
+
+        for (const enemy of this.engine.enemies) {
+            let sprite = this.spriteManager.get(enemy.id);
+            if (!sprite) {
+                sprite = new EnemySprite(enemy.id);
+                this.spriteManager.add(sprite);
+            }
+            const s = sprite as EnemySprite;
+            s.x = enemy.x;
+            s.y = enemy.y;
+            s.hp = enemy.hp;
+            s.maxHp = enemy.maxHp;
+            s.update(16); // Direct call to update for simple animation sync
+        }
         if (this.engine.hp !== this.prevHp) { this.hpPopTimer = 15; this.prevHp = this.engine.hp; }
         if (this.engine.gold !== this.prevGold) { this.goldPopTimer = 15; this.prevGold = this.engine.gold; }
         const currentDeckSize = this.engine.deck.length + this.engine.cards.filter(c => c !== null).length;
@@ -388,7 +416,9 @@ export class Game {
             isCountdownActive: this.engine.isCountdownActive,
             countdownSeconds: this.engine.countdownSeconds,
             noticeAsset: this.noticeAsset,
-            refreshCost: this.engine.refreshCost
+            refreshCost: this.engine.refreshCost,
+            assets: this.assets,
+            spriteManager: this.spriteManager
         };
         this.renderer.render(renderState);
     }
